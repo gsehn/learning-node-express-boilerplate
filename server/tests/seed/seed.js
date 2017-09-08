@@ -1,3 +1,4 @@
+
 const {ObjectID} = require('mongodb');
 const {Todo} = require('./../../models/Todo');
 const {User} = require('./../../models/User');
@@ -23,17 +24,15 @@ const users = [
 
 ];
 
-const populateUsers = (done) => {
-	User.remove({})
-	.then(() => {
-		const user0 = new User(users[0]).save();
-		const user4 = new User(users[4]).save();
-		const user5 = new User(users[5]).save();
-
-		return Promise.all([user0, user4, user5]);
-	})
-	.then(() => done())
-	.catch((err) => console.log(err));
+const populateUsers = async () => {
+	try {
+		await User.remove({});
+		await new User(users[0]).save();
+		await new User(users[4]).save();
+		await new User(users[5]).save();
+	} catch (err) {
+		console.log(err);
+	}
 };
 
 const todos = [
@@ -41,16 +40,14 @@ const todos = [
 	{ _id: new ObjectID(), text: 'Second test todo', completed: true, completedAt: 123123123, _creator: userIds[4] },
 ];
 
-const populateTodos = (done) => {
-	Todo.remove({})
-	.then(() => {
-		return Todo.insertMany(todos);
-	})
-	.then(() => done())
-	.catch((err) => console.log(err));
+const populateTodos = async () => {
+	try {
+		await Todo.remove({});
+		await Todo.insertMany(todos);
+	} catch (err) {
+		console.log(err);
+	}
 };
-
-
 
 module.exports = {
 	todos,

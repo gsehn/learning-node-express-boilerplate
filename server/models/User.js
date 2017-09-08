@@ -41,40 +41,39 @@ UserSchema.methods.toJSON = function () {
 	return _.pick(userObject, ['_id', 'email']);
 };
 
-UserSchema.methods.generateAuthToken = function () {
+UserSchema.methods.generateAuthToken = async function () {
 	const user = this;
 	const access = 'auth';
 	const token = jwt.sign({_id: user._id.toHexString(), access}, process.env.JWT_SECRET).toString();
 
 	user.tokens.push({access, token});
-	return user.save()
-	.then(() => {
-		return token;
-	});
+	await user.save();
+	return token;
 };
 
-UserSchema.statics.findByToken = function (token) {
+UserSchema.statics.findByToken = async function (token) {
 	const User = this;
 	let decoded = undefined;
 
 	try {
 		decoded = jwt.verify(token, process.env.JWT_SECRET);
 	} catch (e) {
-		return Promise.reject();
+		throw new Error(e);
 	}
 
-	return User.findOne({
+	return await User.findOne({
 		'_id': decoded._id,
 		'tokens.token': token,
 		'tokens.access': 'auth'
 	});
 };
 
-UserSchema.statics.findByCredentials = function (email, password) {
+UserSchema.statics.findByCredentials = async function (email, password) {
 	const User = this;
 
-	return User.findOne({email})
-	.then((user) => {
+	try {
+		const user = await User.findOne({email});
+
 		if (!user) {
 			return Promise.reject();
 		}
@@ -88,16 +87,14 @@ UserSchema.statics.findByCredentials = function (email, password) {
 				}
 			});
 		});
-	})
-	.catch(() => {
+	} catch (err) {
 		return Promise.reject();
-	});
+	}
 };
 
-UserSchema.methods.removeToken = function (token) {
+UserSchema.methods.removeToken = async function (token) {
 	const user = this;
-
-	return user.update({
+	await user.update({
 		$pull: {
 			tokens: {token}
 		}

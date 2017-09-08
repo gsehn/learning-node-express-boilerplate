@@ -1,9 +1,10 @@
+
 const {expect} = require('chai');
 const request = require('supertest');
 const _ = require('lodash');
 const {ObjectID} = require('mongodb');
 
-const {app} = require('./../app');
+const {app} = require('./../server');
 const {Todo} = require('./../models/Todo');
 const {todos, populateTodos, users, populateUsers} = require('./seed/seed');
 const {User} = require('./../models/User');
@@ -23,20 +24,21 @@ describe('/todos', () => {
 				.send({text})
 				.expect(200)
 				.expect((res) => {
-					expect(res.body.todo.text).to.equal(text);
+					expect(res.body.text).to.equal(text);
 				})
-				.end((err) => { // could have err, res
+				.end(async (err) => { // could have err, res
 					if (err) {
 						return done(err);
 					}
 
-					Todo.find({ text })
-					.then((todos) => {
+					try {
+						const todos = await Todo.find({ text });
 						expect(todos.length).to.equal(1);
 						expect(todos[0].text).to.equal(text);
 						done();
-					})
-					.catch((err) => done(err));
+					} catch (err) {
+						done(err);
+					}
 				});
 		});
 
@@ -46,18 +48,18 @@ describe('/todos', () => {
 				.set('x-auth', users[4].tokens[0].token)
 				.send({})
 				.expect(400)
-				.end((err) => {
+				.end(async (err) => {
 					if (err) {
 						return done(err);
 					}
-					Todo.find()
-					.then((todos) => {
+
+					try {
+						const todos = await Todo.find();
 						expect(todos.length).to.equal(2);
 						done();
-					})
-					.catch((err) => {
+					} catch (err) {
 						done(err);
-					});
+					}
 				});
 		});
 	});
@@ -115,19 +117,19 @@ describe('/todos', () => {
 				.expect((res) => {
 					expect(res.body.todo._id).to.equal(todos[1]._id.toHexString());
 				})
-				.end((err) => {
+				.end(async (err) => {
 					if (err) {
 						return done(err);
 					}
 
-					Todo.findById(todos[1]._id.toHexString())
-					.then((todo) => {
+					try {
+						const todo = await Todo.findById(todos[1]._id.toHexString());
 						expect(todo).to.not.exist;
 						done();
-					})
-					.catch((err) => {
+					} catch (err) {
 						done(err);
-					});
+					}
+
 				});
 		});
 
@@ -158,9 +160,9 @@ describe('/todos', () => {
 				.send({ text, completed: true })
 				.expect(200)
 				.expect((res) => {
-					expect(res.body.todo.text).to.equal(text);
-					expect(res.body.todo.completed).to.equal(true);
-					expect(res.body.todo.completedAt).to.be.a('number');
+					expect(res.body.text).to.equal(text);
+					expect(res.body.completed).to.equal(true);
+					expect(res.body.completedAt).to.be.a('number');
 				})
 				.end(done);
 		});
@@ -174,9 +176,9 @@ describe('/todos', () => {
 				.set('x-auth', users[4].tokens[0].token)
 				.expect(200)
 				.expect((res) => {
-					expect(res.body.todo.text).to.equal(text);
-					expect(res.body.todo.completed).to.equal(false);
-					expect(res.body.todo.completedAt).to.not.exist;
+					expect(res.body.text).to.equal(text);
+					expect(res.body.completed).to.equal(false);
+					expect(res.body.completedAt).to.not.exist;
 				})
 				.end(done);
 		});
@@ -206,25 +208,23 @@ describe('/users', () => {
 					expect(res.body.user.email).to.equal(users[1].email);
 					expect(res.headers['x-auth']).to.exist;
 				})
-				.end((err) => {
+				.end(async (err) => {
 					if (err) {
 						return done(err);
 					}
 
 					const {email, password} = users[1];
 
-
-					User.find({ email })
-					.then((users) => {
+					try {
+						const users = await User.find({email});
 						expect(users.length).to.equal(1);
 						expect(users[0].email).to.equal(email);
 						expect(users[0].password).to.not.equal(password);
 						done();
-					})
-					.catch((err) => done(err));
+					} catch (err) {
+						done(err);
+					}
 				});
-
-
 		});
 
 		it('should reject duplicate email', (done) => {
@@ -284,19 +284,18 @@ describe('/users', () => {
 				.delete('/users/me/token')
 				.set('x-auth', users[4].tokens[0].token)
 				.expect(200)
-				.end((err, res) => { // eslint-disable-line
+				.end(async (err, res) => { // eslint-disable-line
 					if (err) {
 						return done(err);
 					}
 
-					User.findById(users[4]._id)
-					.then((user) => {
+					try {
+						const user = await User.findById(users[4]._id);
 						expect(user.tokens.length).to.equal(0);
 						done();
-					})
-					.catch((err) => {
+					} catch (err) {
 						done(err);
-					});
+					}
 				});
 		});
 	});
@@ -313,22 +312,21 @@ describe('/users', () => {
 				.expect((res) => {
 					expect(res.headers['x-auth']).to.exist;
 				})
-				.end((err, res) => {
+				.end(async (err, res) => {
 					if (err) {
 						return done(err);
 					}
 
-					User.findOne({email: user.email})
-					.then((user) => {
-						expect(user.tokens[0]).to.include({
+					try {
+						const savedUser = await User.findOne({email: user.email});
+						expect(savedUser.tokens[0]).to.include({
 							access: 'auth',
 							token: res.headers['x-auth']
 						});
 						done();
-					})
-					.catch((err) => {
+					} catch (err) {
 						done(err);
-					});
+					}
 				});
 		});
 
@@ -340,19 +338,18 @@ describe('/users', () => {
 				.post('/users/login')
 				.send(user)
 				.expect(400)
-				.end((err, res) => { // eslint-disable-line
+				.end(async (err, res) => { // eslint-disable-line
 					if (err) {
 						return done(err);
 					}
 
-					User.findOne({email: user.email})
-					.then((user) => {
-						expect(user.tokens.length).to.equal(0);
+					try {
+						const savedUser = await User.findOne({email: user.email});
+						expect(savedUser.tokens.length).to.equal(0);
 						done();
-					})
-					.catch((err) => {
+					} catch (err) {
 						done(err);
-					});
+					}
 				});
 		});
 
